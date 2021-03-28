@@ -1,21 +1,34 @@
 defmodule CaesarCipher do
-  @spec encrypt(binary, binary) :: binary()
-  def encrypt(sentence, offset) when is_binary(sentence) do
+  @spec encrypt(binary, binary) :: tuple()
+  def encrypt(sentence, offset) when is_binary(sentence) and is_binary(offset) do
     normalized_sentence = normalize_sentence(sentence)
 
-    cipher_map = generate_cipher_map(offset)
+    cipher_map = generate_cipher_map(String.downcase(offset))
 
-    result =
+    encrypted_message =
       normalized_sentence
-      |> Enum.reduce("", fn character, partial_sentence ->
-        if character == " " do
-          partial_sentence <> " "
-        else
-          partial_sentence <> cipher_map[character]
-        end
+      |> Enum.reduce("", fn
+        " ", partial_sentence -> partial_sentence <> " "
+        character, partial_sentence -> partial_sentence <> cipher_map[character]
       end)
 
-    result
+    {:ok, encrypted_message}
+  end
+
+  @spec decrypt(binary, binary) :: tuple()
+  def decrypt(sentence, offset) when is_binary(sentence) and is_binary(offset) do
+    normalized_sentence = normalize_sentence(sentence)
+
+    cipher_map = generate_cipher_map(String.downcase(offset), :decrypt)
+
+    decrypted_message =
+      normalized_sentence
+      |> Enum.reduce("", fn
+        " ", partial_sentence -> partial_sentence <> " "
+        character, partial_sentence -> partial_sentence <> cipher_map[character]
+      end)
+
+    {:ok, decrypted_message}
   end
 
   defp normalize_sentence(sentence) do
@@ -47,8 +60,25 @@ defmodule CaesarCipher do
     cipher_map
   end
 
-  defp generate_cipher_map(offset) when not is_binary(offset) do
-    {:error, :should_be_a_letter}
+  defp generate_cipher_map(offset, :decrypt) when is_binary(offset) do
+    cipher = generate_cipher(offset)
+
+    initial_map = initialize_cipher_map(cipher)
+
+    cipher_list = "abcdefghijklmnopqrstuvwxyz" |> String.split("", trim: true)
+
+    %{cipher_map: cipher_map} =
+      initial_map
+      |> Enum.reduce(
+        %{cipher_map: %{}, index: 0},
+        fn {letter, _cipher}, %{cipher_map: cipher_map, index: index} when index < 26 ->
+          updated_map = Map.put(cipher_map, letter, Enum.at(cipher_list, index))
+
+          %{cipher_map: updated_map, index: index + 1}
+        end
+      )
+
+    cipher_map
   end
 
   defp generate_cipher(offset) do
@@ -63,13 +93,13 @@ defmodule CaesarCipher do
     cipher
   end
 
-  defp initialize_cipher_map do
-    letter_list = "abcdefghijklmnopqrstuvwxyz" |> String.split("", trim: true)
+  defp initialize_cipher_map(cipher \\ "abcdefghijklmnopqrstuvwxyz") do
+    letter_list = cipher |> String.split("", trim: true)
 
     cipher_map =
       letter_list
-      |> Enum.reduce(%{}, fn letter, acc ->
-        Map.put(acc, letter, nil)
+      |> Enum.reduce([], fn letter, acc ->
+        acc ++ [{letter, nil}]
       end)
 
     cipher_map
